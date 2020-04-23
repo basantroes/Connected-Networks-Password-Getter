@@ -3,67 +3,58 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 public class Main {
-    public static Process p;
+    //There is no need for global variable, can be local. (Saving memory)
 
     public static void showPassword(String networkName) {
-        String command = "cmd.exe /c  netsh wlan show profiles key=clear name=" + networkName;
+        String[] command = {"cmd.exe", "/c",
+                "netsh wlan show profile key=clear name=\"" + networkName + '"'}; //eg: "SEMICOLON 6408"
         try {
-            p = Runtime.getRuntime().exec(command);
+            Process p = new ProcessBuilder(command).start(); //Make p local & using modern ProcessBuilder instead of Runtime
             Scanner cs = new Scanner(p.getInputStream());
-            String line = "";
+            String line = null;
 
-            while (cs.hasNext()) {
-                line += cs.nextLine();
-                line += "\n";
-            }
+            while (cs.hasNext())
+                if ((line = cs.nextLine()).matches("[ ]{4}Key Content[ ]{12}: .*")) //.* = any char
+                    break;
 
-            String s = line.substring(line.indexOf("Key Content") + 25);
-            System.out.print("Password: " + s.substring(0, s.indexOf("\n")));
-            //  String[] arr=s.split()
+            if (line != null) System.out.println("Password:" + line.substring(line.indexOf(':') + 1));
 
         } catch (IOException e) {
-            e.printStackTrace();
+            e.printStackTrace(); //System.err.println(e); //Print error to console
         }
     }
 
     public static void showAllConnectedNetworks() {
         ArrayList<String> allNetworks = new ArrayList<>();
         try {
-            p = Runtime.getRuntime().exec("cmd.exe /c netsh wlan show profiles");
+            Process p = new ProcessBuilder("cmd.exe", "/c", "netsh wlan show profiles").start();
             Scanner scs = new Scanner(p.getInputStream());
-            String line = "";
-            int lineNo = 0;
+            String line;
 
-            while (scs.hasNext()) {
-                line += scs.nextLine() + "\n";
-                lineNo++;
-            }
+            while (scs.hasNext())
+                if ((line = scs.nextLine()).matches("[ ]{4}All User Profile[ ]{5}: .*"))
+                    allNetworks.add("-" + line.substring(line.indexOf(':') + 1));
 
-            for (int i = 0; i < lineNo + 1; i++) {
-                if (line.contains("All User Profile")) {
-                    String recS = line.substring(line.indexOf("All User Profile") + 22);
-                    allNetworks.add(recS.substring(0, recS.indexOf("\n")));
-                    System.out.println(allNetworks.get(i));
-                    line = recS;
-                } else break;
-            }
+            allNetworks.forEach(System.out::println); //Print every network in list by method reference
 
         } catch (IOException e) {
-            e.printStackTrace();
+            e.printStackTrace(); //System.err.println(e); //Print error to console
         }
-
     }
 
     public static void main(String[] args) {
         System.out.println("All connected networks are: ");
         showAllConnectedNetworks();
 
+        final Scanner scan = new Scanner(System.in); //Saving memory by declaring once
+
         while (true) {
-            System.out.println("Enter the  network name from the previous list: ");
-            Scanner scan = new Scanner(System.in);
-            String name = scan.next();
+            System.out.print("Enter the network name: ");
+            String name = scan.nextLine(); //Read the entire network name (eg: SEMICOLON 6408)
+            if (name.matches("[ \\n]*")) break; //Prevent infinite loop
             showPassword(name);
             System.out.print("\n");
         }
+        scan.close();
     }
 }
